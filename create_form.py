@@ -82,8 +82,8 @@ async def download_image_async(
     session: aiohttp.ClientSession, url: str
 ) -> Optional[str]:
     """
-    Asynchronously downloads an image with aggressive optimization for fast downloads and small file size.
-    Converts all images to JPEG with reduced quality for faster processing.
+    Asynchronously downloads an image and processes it for LaTeX inclusion.
+    Converts all images to JPEG for consistent handling.
     """
     if not os.path.exists(IMAGE_DIR):
         os.makedirs(IMAGE_DIR)
@@ -112,22 +112,20 @@ async def download_image_async(
             try:
                 img = Image.open(BytesIO(image_data))
 
-                # Aggressive resize to reduce file size and speed up processing
-                # Max dimensions for report images (maintains aspect ratio)
-                max_width = 800  # Reduced from 1200
-                max_height = 800  # Reduced from 1200
+                # Resize to reasonable dimensions for report images (maintains aspect ratio)
+                max_width = 1200
+                max_height = 1200
 
                 if img.width > max_width or img.height > max_height:
-                    # Use BILINEAR for faster resizing (vs LANCZOS)
-                    img.thumbnail((max_width, max_height), Image.Resampling.BILINEAR)
+                    # Use LANCZOS for high-quality resizing
+                    img.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
 
                 # Convert to RGB if necessary (all images become JPEG)
                 if img.mode not in ("RGB", "L"):
                     img = img.convert("RGB")
 
-                # Save as JPEG with lower quality for faster processing and smaller size
-                # Quality 70 is a good balance between size and visual quality
-                img.save(filepath, "JPEG", quality=70, optimize=False)
+                # Save as JPEG with good quality
+                img.save(filepath, "JPEG", quality=85, optimize=True)
                 return filepath
 
             except Exception:
@@ -650,17 +648,17 @@ async def collect_all_image_urls(data) -> list[str]:
 
 
 async def download_images_background(urls: list[str]):
-    """Downloads all images in the background concurrently with aggressive optimization."""
+    """Downloads all images in the background concurrently."""
     if not urls:
         return
 
-    print(f"\n🚀 Starting fast download of {len(urls)} images...")
+    print(f"\n🚀 Starting download of {len(urls)} images...")
 
-    # Aggressive timeout settings for faster failure and retry
-    timeout = aiohttp.ClientTimeout(total=20, connect=5, sock_read=10)
-    # Increase concurrent connections from 10 to 30 for faster parallel downloads
+    # Reasonable timeout settings
+    timeout = aiohttp.ClientTimeout(total=60, connect=10, sock_read=30)
+    # Limit concurrent connections to avoid overwhelming servers
     connector = aiohttp.TCPConnector(
-        limit=30, force_close=True, enable_cleanup_closed=True
+        limit=10, force_close=True, enable_cleanup_closed=True
     )
 
     async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
