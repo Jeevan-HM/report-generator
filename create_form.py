@@ -211,7 +211,11 @@ def generate_latex_body(data):
 
             comments = item.get("comments", [])
             if comments:
-                body.append(r"\begin{tabular}{c c c c " + comment_col + "}")
+                body.append(r"\begin{longtable}{c c c c " + comment_col + "}")
+                # Add a header that will repeat if the table spans pages
+                body.append(
+                    r"\textbf{I} & \textbf{NI} & \textbf{NP} & \textbf{D} & \textbf{Comments} \\ \hline \endhead"
+                )
 
                 for k, comment in enumerate(comments, start=1):
                     label_text = f"{k}. {comment.get('label', '')}"
@@ -298,7 +302,7 @@ def generate_latex_body(data):
                     # --- UPDATED LOGIC FOR SAFER IMAGE SIZING ---
                     # END
 
-                body.append(r"\end{tabular}" + "\n")
+                body.append(r"\end{longtable}" + "\n")
 
             body.append(r"\vspace{1.5em}")  # Increased space between items
 
