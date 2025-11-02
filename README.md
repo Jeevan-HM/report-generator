@@ -479,4 +479,4 @@ This project was built for the VillageHacks hackathon.
 
 **This code is proprietary and all rights are reserved by Jeevan Hebbal Manjunath.** It is not open source. You may not use, copy, modify, or distribute this code for any purpose, especially for commercial use, without express written permission.
 
-Please see the [LICENSE.md](LICENSE.md) file for full details.
+Please see the [LICENSE](LICENSE) file for full details.
