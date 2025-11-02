@@ -86,7 +86,7 @@ def upload_file():
         # Generate PDF asynchronously
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        pdf_path = loop.run_until_complete(
+        pdf_path, cleanup_dir, cleanup_tex = loop.run_until_complete(
             generate_pdf_from_json(json_data, latex_output)
         )
         loop.close()
@@ -96,12 +96,27 @@ def upload_file():
             return redirect(url_for("index"))
 
         flash("Report generated successfully!", "success")
-        return send_file(
+        
+        # Import cleanup function
+        from create_form import cleanup_temp_files
+        
+        # Send file and register cleanup after response
+        response = send_file(
             pdf_path,
             as_attachment=True,
             download_name=f"inspection_report_{timestamp}.pdf",
             mimetype="application/pdf",
         )
+        
+        # Schedule cleanup to happen after response is sent
+        @response.call_on_close
+        def cleanup_after_download():
+            try:
+                cleanup_temp_files(cleanup_dir, cleanup_tex)
+            except Exception:
+                pass  # Silently fail on cleanup errors
+        
+        return response
 
     except json.JSONDecodeError:
         flash("Invalid JSON file format", "error")

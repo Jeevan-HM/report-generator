@@ -528,7 +528,7 @@ def generate_latex_body(data):
 
                     photos = comment.get("photos", [])
                     if photos:
-                        valid_image_paths = []
+                        valid_image_data = []
                         for photo in photos:
                             url = photo.get("url")
                             if url:
@@ -538,14 +538,18 @@ def generate_latex_body(data):
                                     relative_img_path = os.path.join(
                                         "images", img_filename
                                     ).replace("\\", "/")
-                                    valid_image_paths.append(relative_img_path)
+                                    caption = photo.get("caption", "")
+                                    valid_image_data.append({
+                                        "path": relative_img_path,
+                                        "caption": caption
+                                    })
                                 else:
                                     print(
                                         f"⚠️  Image not yet cached, skipping: {url[:60]}..."
                                     )
 
-                        if valid_image_paths:
-                            num_photos = len(valid_image_paths)
+                        if valid_image_data:
+                            num_photos = len(valid_image_data)
 
                             # Calculate image width to fit within comment column
                             if num_photos == 1:
@@ -561,18 +565,31 @@ def generate_latex_body(data):
                                 img_width = "1.0in"
                                 max_height = "1.5in"
 
-                            # Build images in a row
+                            # Build images with captions in a row
                             image_parts = []
-                            for path in valid_image_paths:
-                                image_parts.append(
-                                    r"\includegraphics[width="
-                                    + img_width
-                                    + ", height="
-                                    + max_height
-                                    + r", keepaspectratio]{"
-                                    + path
-                                    + "}"
+                            for img_data in valid_image_data:
+                                img_path = img_data["path"]
+                                caption = img_data["caption"]
+                                
+                                # Create image with caption below
+                                img_with_caption = (
+                                    r"\begin{minipage}[t]{" + img_width + r"}" + "\n"
+                                    r"                                \centering" + "\n"
+                                    r"                                \includegraphics[width=" + img_width + 
+                                    ", height=" + max_height + 
+                                    r", keepaspectratio]{" + img_path + r"}"
                                 )
+                                
+                                # Add caption if it exists
+                                if caption:
+                                    caption_latex = escape_latex(caption)
+                                    img_with_caption += (
+                                        "\n" + r"                                \vspace{0.1cm} \\" + "\n"
+                                        r"                                {\small\itshape " + caption_latex + r"}"
+                                    )
+                                
+                                img_with_caption += "\n" + r"                                \end{minipage}"
+                                image_parts.append(img_with_caption)
 
                             # Join images with spacing
                             all_images = r" \hspace{0.2cm} ".join(image_parts)
@@ -808,7 +825,7 @@ def compress_pdf_pypdf(input_pdf: str) -> str:
         return input_pdf
 
 
-async def generate_pdf_from_json(json_data: dict, output_dir: str = "latex") -> str:
+async def generate_pdf_from_json(json_data: dict, output_dir: str = "latex") -> tuple[str, str, str]:
     """
     Optimized function to generate PDF from JSON data.
     Returns the path to the generated PDF file.
@@ -932,10 +949,9 @@ async def generate_pdf_from_json(json_data: dict, output_dir: str = "latex") -> 
         )
         final_pdf_file = compressed_pdf
 
-    # Cleanup temporary files (including log files)
-    cleanup_temp_files(output_dir, tex_filename_only)
-
-    return final_pdf_file
+    # Don't cleanup yet - will be cleaned after PDF download
+    # Return both PDF path and cleanup info
+    return final_pdf_file, output_dir, tex_filename_only
 
 
 def cleanup_temp_files(output_dir: str, tex_filename: str):
