@@ -82,84 +82,60 @@ async def download_image_async(
     session: aiohttp.ClientSession, url: str
 ) -> Optional[str]:
     """
-    Asynchronously downloads an image, checks its REAL format using Pillow,
-    converts unsupported formats (like WEBP) to PNG,
-    saves it to the IMAGE_DIR, and returns the local path.
+    Asynchronously downloads an image with aggressive optimization for fast downloads and small file size.
+    Converts all images to JPEG with reduced quality for faster processing.
     """
     if not os.path.exists(IMAGE_DIR):
         os.makedirs(IMAGE_DIR)
 
     filename_hash = hashlib.md5(url.encode("utf-8")).hexdigest()
+    ext = ".jpg"
+    filepath = os.path.join(IMAGE_DIR, filename_hash + ext)
+
+    # Return if already cached
+    if os.path.exists(filepath):
+        return filepath
 
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         }
 
-        async with session.get(url, headers=headers, timeout=30) as response:
+        async with session.get(url, headers=headers) as response:
             if response.status != 200:
                 print(f"⚠️  Failed to download {url} (Status: {response.status})")
                 return None
 
             image_data = await response.read()
 
-            # Use Pillow to identify and process the image format
+            # Use Pillow to process the image
             try:
                 img = Image.open(BytesIO(image_data))
-                file_format = img.format.lower() if img.format else "unknown"
 
-                # Convert WEBP and other unsupported formats to PNG
-                if file_format in ["webp", "svg", "bmp", "tiff"]:
-                    ext = ".png"
-                    filepath = os.path.join(IMAGE_DIR, filename_hash + ext)
+                # Aggressive resize to reduce file size and speed up processing
+                # Max dimensions for report images (maintains aspect ratio)
+                max_width = 800  # Reduced from 1200
+                max_height = 800  # Reduced from 1200
 
-                    if os.path.exists(filepath):
-                        return filepath
+                if img.width > max_width or img.height > max_height:
+                    # Use BILINEAR for faster resizing (vs LANCZOS)
+                    img.thumbnail((max_width, max_height), Image.Resampling.BILINEAR)
 
-                    # Convert to RGB if necessary
-                    if img.mode in ("RGBA", "LA", "P"):
-                        img = img.convert("RGB")
+                # Convert to RGB if necessary (all images become JPEG)
+                if img.mode not in ("RGB", "L"):
+                    img = img.convert("RGB")
 
-                    img.save(filepath, "PNG")
-                    print(
-                        f"✓ Converted {file_format.upper()} → PNG: {os.path.basename(filepath)}"
-                    )
-                    return filepath
-
-                if file_format == "jpeg":
-                    ext = ".jpg"
-                elif file_format == "png":
-                    ext = ".png"
-                else:
-                    # Default to PNG for unknown formats
-                    ext = ".png"
-                    filepath = os.path.join(IMAGE_DIR, filename_hash + ext)
-
-                    if os.path.exists(filepath):
-                        return filepath
-
-                    if img.mode in ("RGBA", "LA", "P"):
-                        img = img.convert("RGB")
-
-                    img.save(filepath, "PNG")
-                    print(f"✓ Converted unknown → PNG: {os.path.basename(filepath)}")
-                    return filepath
-
-            except Exception as e:
-                print(
-                    f"⚠️  Could not identify image {url}. Defaulting to .jpg. Error: {e}"
-                )
-                ext = ".jpg"
-
-            filepath = os.path.join(IMAGE_DIR, filename_hash + ext)
-
-            if os.path.exists(filepath):
+                # Save as JPEG with lower quality for faster processing and smaller size
+                # Quality 70 is a good balance between size and visual quality
+                img.save(filepath, "JPEG", quality=70, optimize=False)
                 return filepath
 
-            with open(filepath, "wb") as f:
-                f.write(image_data)
+            except Exception:
+                # If image processing fails, save raw data
+                with open(filepath, "wb") as f:
+                    f.write(image_data)
+                return filepath
 
-        print(f"✓ Downloaded: {os.path.basename(filepath)}")
         return filepath
 
     except asyncio.TimeoutError:
@@ -657,14 +633,18 @@ async def collect_all_image_urls(data) -> list[str]:
 
 
 async def download_images_background(urls: list[str]):
-    """Downloads all images in the background concurrently."""
+    """Downloads all images in the background concurrently with aggressive optimization."""
     if not urls:
         return
 
-    print(f"\n🚀 Starting background download of {len(urls)} images...")
+    print(f"\n🚀 Starting fast download of {len(urls)} images...")
 
-    timeout = aiohttp.ClientTimeout(total=60, connect=10)
-    connector = aiohttp.TCPConnector(limit=10)
+    # Aggressive timeout settings for faster failure and retry
+    timeout = aiohttp.ClientTimeout(total=20, connect=5, sock_read=10)
+    # Increase concurrent connections from 10 to 30 for faster parallel downloads
+    connector = aiohttp.TCPConnector(
+        limit=30, force_close=True, enable_cleanup_closed=True
+    )
 
     async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
         tasks = [download_and_cache_image(session, url) for url in urls]
@@ -732,6 +712,100 @@ def populate_header_data(template_content, data):
         template_content = template_content.replace(placeholder, value)
 
     return template_content
+
+
+def compress_pdf(input_pdf: str) -> str:
+    """
+    Compress PDF using Ghostscript for faster downloads.
+    Returns path to compressed PDF, or original if compression fails.
+    """
+    output_pdf = input_pdf.replace(".pdf", "_compressed.pdf")
+
+    try:
+        # Try using Ghostscript for compression
+        # Settings: screen = lowest quality (72dpi), ebook = medium (150dpi), printer = high (300dpi)
+        gs_command = [
+            "gs",
+            "-sDEVICE=pdfwrite",
+            "-dCompatibilityLevel=1.4",
+            "-dPDFSETTINGS=/ebook",  # Good balance of quality and size
+            "-dNOPAUSE",
+            "-dQUIET",
+            "-dBATCH",
+            "-dDetectDuplicateImages=true",
+            "-dCompressFonts=true",
+            "-dDownsampleColorImages=true",
+            "-dColorImageResolution=150",
+            "-dDownsampleGrayImages=true",
+            "-dGrayImageResolution=150",
+            "-dDownsampleMonoImages=true",
+            "-dMonoImageResolution=150",
+            f"-sOutputFile={output_pdf}",
+            input_pdf,
+        ]
+
+        result = subprocess.run(
+            gs_command,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        if result.returncode == 0 and os.path.exists(output_pdf):
+            # Replace original with compressed version
+            os.remove(input_pdf)
+            os.rename(output_pdf, input_pdf)
+            return input_pdf
+        else:
+            print(
+                f"⚠️  Ghostscript compression failed: {result.stderr[:100] if result.stderr else 'Unknown error'}"
+            )
+            # Try alternative method with PyPDF2
+            return compress_pdf_pypdf(input_pdf)
+
+    except FileNotFoundError:
+        print("⚠️  Ghostscript not found, trying alternative compression...")
+        return compress_pdf_pypdf(input_pdf)
+    except subprocess.TimeoutExpired:
+        print("⚠️  PDF compression timed out")
+        return input_pdf
+    except Exception as e:
+        print(f"⚠️  PDF compression error: {e}")
+        return input_pdf
+
+
+def compress_pdf_pypdf(input_pdf: str) -> str:
+    """
+    Alternative PDF compression using PyPDF2 (lighter compression).
+    """
+    try:
+        from PyPDF2 import PdfReader, PdfWriter
+
+        reader = PdfReader(input_pdf)
+        writer = PdfWriter()
+
+        for page in reader.pages:
+            page.compress_content_streams()
+            writer.add_page(page)
+
+        # Write to temporary file
+        temp_pdf = input_pdf.replace(".pdf", "_temp.pdf")
+        with open(temp_pdf, "wb") as output_file:
+            writer.write(output_file)
+
+        # Replace original with compressed
+        if os.path.exists(temp_pdf):
+            os.remove(input_pdf)
+            os.rename(temp_pdf, input_pdf)
+            print("✓ Used PyPDF2 compression (lighter)")
+
+        return input_pdf
+    except ImportError:
+        print("⚠️  PyPDF2 not available, skipping compression")
+        return input_pdf
+    except Exception as e:
+        print(f"⚠️  PyPDF2 compression error: {e}")
+        return input_pdf
 
 
 async def generate_pdf_from_json(json_data: dict, output_dir: str = "latex") -> str:
@@ -813,6 +887,12 @@ async def generate_pdf_from_json(json_data: dict, output_dir: str = "latex") -> 
         capture_output=True,
         text=True,
     )
+    result = subprocess.run(
+        ["pdflatex", "-interaction=nonstopmode", tex_filename_only],
+        cwd=output_dir,
+        capture_output=True,
+        text=True,
+    )
 
     # Check if PDF was actually generated (more reliable than exit code)
     if not os.path.exists(final_pdf_file):
@@ -839,6 +919,19 @@ async def generate_pdf_from_json(json_data: dict, output_dir: str = "latex") -> 
         msg = f"{error_msg}\nReturn code: {result.returncode}\nStderr: {result.stderr[:200] if result.stderr else 'None'}"
         raise Exception(msg)
 
+    # Compress PDF to reduce file size
+    print(f"📦 Compressing PDF...")
+    compressed_pdf = compress_pdf(final_pdf_file)
+    if compressed_pdf and os.path.exists(compressed_pdf):
+        # Get file sizes for comparison
+        original_size = os.path.getsize(final_pdf_file) / (1024 * 1024)  # MB
+        compressed_size = os.path.getsize(compressed_pdf) / (1024 * 1024)  # MB
+        reduction = ((original_size - compressed_size) / original_size) * 100
+        print(
+            f"✓ PDF compressed: {original_size:.2f}MB → {compressed_size:.2f}MB ({reduction:.1f}% reduction)"
+        )
+        final_pdf_file = compressed_pdf
+
     # Cleanup temporary files (including log files)
     cleanup_temp_files(output_dir, tex_filename_only)
 
@@ -862,10 +955,10 @@ def cleanup_temp_files(output_dir: str, tex_filename: str):
     base_name = tex_filename.replace(".tex", "")
     latex_temp_files = [
         f"{base_name}.tex",
-        f"{base_name}.aux",
+        # f"{base_name}.aux",
         f"{base_name}.log",
         f"{base_name}.out",
-        f"{base_name}.toc",
+        # f"{base_name}.toc",
         f"{base_name}.fls",
         f"{base_name}.fdb_latexmk",
         f"{base_name}.synctex.gz",
