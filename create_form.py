@@ -3,6 +3,7 @@ import glob
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
@@ -416,6 +417,7 @@ def generate_title_page(data):
     title.append(r"")
 
     # Add the images side by side
+    # These images should be in the latex/ folder (not latex/images/)
     title.append(r"\begin{minipage}{0.48\textwidth}")
     title.append(r"\centering")
     title.append(
@@ -633,6 +635,14 @@ async def collect_all_image_urls(data) -> list[str]:
     sections = data.get("inspection", {}).get("sections", [])
 
     for section in sections:
+        # Collect section-level media (e.g., obstruction.png, scope.png)
+        section_media = section.get("media", [])
+        for media_item in section_media:
+            url = media_item.get("url")
+            # Only add if it's a valid URL (starts with http:// or https://)
+            if url and url.startswith(("http://", "https://")):
+                urls.add(url)
+
         line_items = section.get("lineItems", [])
         for item in line_items:
             comments = item.get("comments", [])
@@ -640,7 +650,7 @@ async def collect_all_image_urls(data) -> list[str]:
                 photos = comment.get("photos", [])
                 for photo in photos:
                     url = photo.get("url")
-                    if url:
+                    if url and url.startswith(("http://", "https://")):
                         urls.add(url)
 
     return list(urls)
@@ -754,6 +764,18 @@ async def generate_pdf_from_json(json_data: dict, output_dir: str = "latex") -> 
     # Download images concurrently
     if image_urls:
         await download_images_background(image_urls)
+
+    # Copy static images (obstruction.png and scope.png) to output directory
+    static_images = ["obstruction.png", "scope.png"]
+    for img_name in static_images:
+        src_path = os.path.join("latex", img_name)
+        dst_path = os.path.join(output_dir, img_name)
+        if os.path.exists(src_path):
+            try:
+                shutil.copy2(src_path, dst_path)
+                print(f"✓ Copied {img_name} to output directory")
+            except Exception as e:
+                print(f"⚠️  Failed to copy {img_name}: {e}")
 
     # Generate report body (CPU-intensive, run in thread pool)
     loop = asyncio.get_event_loop()

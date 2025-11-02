@@ -608,6 +608,225 @@ body {
         width: 100%;
         justify-content: center;
     }
+
+    .button-group {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .button-group .submit-btn {
+        width: 100%;
+    }
+}
+
+/* AI Analysis Styles */
+.ai-toggle-section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+    border-radius: 12px;
+    margin: 1.5rem 0;
+    border: 2px solid rgba(102, 126, 234, 0.2);
+}
+
+.ai-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: var(--primary);
+}
+
+.ai-icon {
+    width: 24px;
+    height: 24px;
+    stroke: var(--primary);
+}
+
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 30px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: 0.4s;
+    border-radius: 30px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 22px;
+    width: 22px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: 0.4s;
+    border-radius: 50%;
+}
+
+input:checked+.toggle-slider {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+}
+
+input:checked+.toggle-slider:before {
+    transform: translateX(30px);
+}
+
+/* Button Group */
+.button-group {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 1.5rem;
+}
+
+.ai-btn {
+    background: linear-gradient(135deg, #10b981, #059669) !important;
+    margin-bottom: 0;
+}
+
+.ai-btn:hover {
+    background: linear-gradient(135deg, #059669, #047857) !important;
+    transform: translateY(-2px);
+}
+
+.ai-results-card {
+    background: var(--bg-secondary);
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: var(--shadow-xl);
+    margin: 2rem 0;
+    animation: slideInUp 0.5s ease-out;
+}
+
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.ai-results-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--border);
+}
+
+.ai-results-icon {
+    width: 32px;
+    height: 32px;
+    stroke: var(--primary);
+}
+
+.ai-results-header h3 {
+    color: var(--text-primary);
+    font-size: 1.5rem;
+}
+
+.ai-section {
+    margin: 1.5rem 0;
+    padding: 1.5rem;
+    border-radius: 12px;
+    background: var(--bg-primary);
+    border-left: 4px solid var(--primary);
+}
+
+.ai-section.safety {
+    background: rgba(239, 68, 68, 0.05);
+    border-left-color: var(--error);
+}
+
+.ai-section.urgent {
+    background: rgba(245, 158, 11, 0.05);
+    border-left-color: var(--warning);
+}
+
+.ai-section.routine {
+    background: rgba(16, 185, 129, 0.05);
+    border-left-color: var(--success);
+}
+
+.ai-section h4 {
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+    font-size: 1.1rem;
+}
+
+.ai-summary {
+    color: var(--text-secondary);
+    line-height: 1.8;
+    white-space: pre-wrap;
+}
+
+.ai-priorities {
+    font-family: 'Inter', sans-serif;
+    background: white;
+    padding: 1rem;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    line-height: 1.8;
+    white-space: pre-wrap;
+    border: 1px solid var(--border);
+}
+
+.ai-section ul {
+    list-style: none;
+    padding: 0;
+}
+
+.ai-section ul li {
+    padding: 0.75rem;
+    margin: 0.5rem 0;
+    background: white;
+    border-radius: 8px;
+    border-left: 3px solid currentColor;
+    color: var(--text-secondary);
+    transition: all 0.3s ease;
+}
+
+.ai-section ul li:hover {
+    transform: translateX(5px);
+    box-shadow: var(--shadow-md);
+}
+
+.ai-section.safety ul li {
+    border-left-color: var(--error);
+}
+
+.ai-section.urgent ul li {
+    border-left-color: var(--warning);
+}
+
+.ai-section.routine ul li {
+    border-left-color: var(--success);
 }
 
 @media (max-width: 480px) {
@@ -618,5 +837,14 @@ body {
 
     .header h1 {
         font-size: 1.5rem;
+    }
+
+    .ai-toggle-section {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .ai-results-card {
+        padding: 1.5rem;
     }
 }

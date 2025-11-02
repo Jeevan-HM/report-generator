@@ -8,11 +8,20 @@ A high-performance Flask web application that generates professional, TREC-compl
 
 ## ✨ Features
 
+### 🤖 AI-Powered Analysis
+- **Executive Summary**: AI-generated overview of property condition with key insights
+- **Smart Deficiency Categorization**: Automatically sorts issues by priority (Safety, Urgent, Routine)
+- **Priority Breakdown**: Visual counts and detailed analysis of issues by severity
+- **Free Tier Available**: Uses Google Gemini 1.5 Flash API (1,500 requests/day free)
+- **Optional**: Toggle on/off per analysis - doesn't affect regular PDF generation speed
+- **Smart Integration**: Only 2 API calls per analysis for optimal efficiency
+
 ### 🚀 Performance
 - **Lightning Fast**: Async image downloading with aiohttp and concurrent processing
 - **Thread Pool Optimization**: CPU-intensive LaTeX generation runs in parallel
 - **Smart Caching**: Images are cached to avoid redundant downloads
 - **Batch Processing**: Handles multiple images and sections efficiently
+- **Efficient AI**: Only 2 API calls per analysis (when enabled)
 
 ### 📄 PDF Generation
 - **TREC-Compliant**: Follows Texas Real Estate Commission standards
@@ -24,6 +33,8 @@ A high-performance Flask web application that generates professional, TREC-compl
 ### 🎨 User Interface
 - **Modern Design**: Gradient color scheme with smooth animations
 - **Drag & Drop**: Easy file upload with visual feedback
+- **AI Toggle**: Easy on/off switch for AI analysis
+- **Results Display**: Beautiful, color-coded AI insights
 - **Loading Animation**: Beautiful progress indicators with step tracking
 - **Responsive**: Works seamlessly on desktop and mobile devices
 - **Form Reset**: Automatically resets for multiple uploads
@@ -37,27 +48,37 @@ A high-performance Flask web application that generates professional, TREC-compl
 ## 🛠️ Technology Stack
 
 **Backend**
-- Flask 3.0.0 - Web framework
-- asyncio - Asynchronous processing
-- aiohttp 3.9.1 - Async HTTP client for image downloads
+- Flask 3.0.0 - Modern web framework
+- asyncio - Asynchronous processing for optimal performance
+- aiohttp 3.9.1 - Async HTTP client for concurrent image downloads
 
 **PDF Generation**
-- LaTeX (pdflatex) - Professional typesetting
-- Custom template system - Dynamic content insertion
+- LaTeX (pdflatex) - Professional typesetting system
+- Custom template system - Dynamic content insertion with proper escaping
+- Thread pool optimization - CPU-intensive operations run in parallel
 
 **Image Processing**
-- Pillow 10.1.0 - Image manipulation and format conversion
+- Pillow 10.1.0 - Image format detection and conversion
+- Smart caching - Avoids redundant downloads
+- Auto-conversion - WEBP, PNG, JPG formats supported
+
+**AI Integration**
+- Google Generative AI 0.3.2 - Gemini 1.5 Flash API
+- JSON-mode responses - Structured, reliable outputs
+- Error handling - Graceful fallbacks for API issues
 
 **Frontend**
-- HTML5, CSS3 - Modern web standards
-- Vanilla JavaScript - No framework dependencies
-- Google Fonts (Inter) - Clean typography
+- HTML5, CSS3 - Modern responsive design
+- Vanilla JavaScript - No framework dependencies, lightweight
+- Google Fonts (Inter) - Professional typography
+- Gradient UI - Modern color scheme with smooth animations
 
 ## 📋 Prerequisites
 
 - Python 3.8 or higher
 - LaTeX distribution (TeX Live, MiKTeX, or MacTeX)
 - Modern web browser (Chrome, Firefox, Safari, Edge)
+- (Optional) Google Gemini API key for AI analysis features
 
 ## 🐳 Quick Start with Docker
 
@@ -145,28 +166,45 @@ chmod +x start.sh
 
 The application will be available at `http://localhost:8080`
 
+### 5. (Optional) Set Up AI Analysis
+
+To enable AI-powered analysis features:
+
+1. Get a free API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Create a `.env` file in the project root:
+   ```bash
+   GEMINI_API_KEY=your_api_key_here
+   ```
+3. The AI toggle will automatically appear in the web interface
+
+**Note**: Without an API key, the app works perfectly fine - you just won't have AI analysis features.
+
 ## 📁 Project Structure
 
 ```
 Startup-Village-2025/
-├── app.py                  # Flask application entry point
-├── create_form.py          # PDF generation logic
+├── app.py                  # Flask application and routes
+├── create_form.py          # PDF generation logic with async processing
+├── gemini_ai.py           # AI analysis integration
 ├── requirements.txt        # Python dependencies
+├── pyproject.toml         # Project configuration (uv)
 ├── Dockerfile             # Docker configuration
-├── start.sh               # Startup script
+├── docker-compose.yml     # Docker compose setup
 │
 ├── templates/
-│   └── index.html         # Main web interface
+│   └── index.html         # Modern responsive web interface
 │
 ├── static/
 │   └── css/
-│       └── style.css      # Application styles
+│       └── style.css      # Gradient UI with animations
 │
 ├── latex/
-│   └── report.tex         # LaTeX template
+│   ├── report.tex         # LaTeX template
+│   ├── obstruction.png    # Static template image
+│   └── scope.png          # Static template image
 │
 ├── uploads/               # Temporary JSON uploads
-└── outputs/               # Generated PDFs and temp files
+└── outputs/               # Generated PDFs (timestamped folders)
 ```
 
 ## 🎯 Usage
@@ -220,17 +258,27 @@ Your JSON file should follow this structure:
 
 ### 2. Upload and Generate
 
-1. Open the application in your browser
+#### Standard PDF Generation:
+1. Open the application in your browser (`http://localhost:8080`)
 2. Click "Choose JSON file" or drag and drop your file
 3. Click "Generate Report"
 4. Wait for the progress animation to complete
 5. Your PDF will automatically download
 
-### 3. Upload Another File
+#### With AI Analysis:
+1. Enable the "AI-Powered Analysis" toggle
+2. Upload your JSON file
+3. Click "Get AI Analysis" to see insights
+4. Review the AI-generated summary and recommendations
+5. Click "Generate Report" to create the PDF
+6. Both buttons work independently - analyze first, then generate, or just generate directly
+
+### 3. Multiple Reports
 
 After generation completes:
 - The form automatically resets
 - Simply select another JSON file
+- Toggle AI analysis on/off as needed
 - Generate as many reports as needed
 
 ## 🔧 Configuration
@@ -274,13 +322,15 @@ Edit `create_form.py` in the `generate_latex_body()` function.
 
 ### Images Not Appearing
 
-**Issue**: Images don't show in PDF
+**Issue**: Images don't show in PDF or show as text labels
 
 **Solutions:**
-1. Verify image URLs are publicly accessible
+1. Verify image URLs are publicly accessible and start with `http://` or `https://`
 2. Check internet connection
-3. Look for download errors in console output
-4. Supported formats: JPG, PNG, WEBP (auto-converted)
+3. Look for download errors in console output (shows "✓ Downloaded X/Y images")
+4. Static images (obstruction.png, scope.png) are automatically copied from latex/ folder
+5. Supported formats: JPG, PNG, WEBP (auto-converted to PNG)
+6. Check `outputs/[timestamp]/images/` folder to verify images were downloaded
 
 ### Loading Animation Stuck
 
@@ -343,10 +393,13 @@ export SECRET_KEY="generate-a-secure-random-key"
 
 ## 📊 Performance
 
-- **Average Generation Time**: 3-8 seconds (depends on image count)
-- **Concurrent Image Downloads**: Up to 10 parallel connections
+- **Average Generation Time**: 3-8 seconds (depends on image count and complexity)
+- **Concurrent Image Downloads**: Up to 10 parallel connections with aiohttp
+- **AI Analysis Time**: 2-4 seconds (2 API calls via Gemini Flash)
 - **Maximum File Size**: 50MB JSON files
-- **PDF Size**: Typically 2-15MB depending on images
+- **PDF Size**: Typically 2-15MB depending on images and content
+- **Thread Pool**: 4 workers for parallel LaTeX processing
+- **Image Caching**: Smart caching prevents redundant downloads
 
 ## 🤝 Contributing
 

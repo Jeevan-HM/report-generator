@@ -5,10 +5,24 @@ import secrets
 from datetime import datetime
 from pathlib import Path
 
-from flask import Flask, flash, redirect, render_template, request, send_file, url_for
+from dotenv import load_dotenv
+from flask import (
+    Flask,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    url_for,
+)
 from werkzeug.utils import secure_filename
 
 from create_form import generate_pdf_from_json
+
+# Load environment variables from .env file
+load_dotenv()
+from gemini_ai import get_gemini_analyzer
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
@@ -96,10 +110,71 @@ def upload_file():
         return redirect(url_for("index"))
 
 
+@app.route("/analyze", methods=["POST"])
+def analyze_inspection():
+    """
+    AI-powered inspection analysis endpoint.
+    Returns executive summary and deficiency categorization.
+    Only called when user explicitly requests AI analysis.
+    """
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+
+    file = request.files["file"]
+
+    if not allowed_file(file.filename):
+        return jsonify({"error": "Only JSON files allowed"}), 400
+
+    try:
+        # Parse JSON
+        json_data = json.load(file.stream)
+
+        # Get Gemini analyzer
+        analyzer = get_gemini_analyzer()
+
+        if not analyzer.is_enabled():
+            return jsonify(
+                {
+                    "error": "AI analysis not available. Set GEMINI_API_KEY environment variable."
+                }
+            ), 503
+
+        # Run AI analysis (2 API calls total)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        try:
+            executive_summary = loop.run_until_complete(
+                analyzer.generate_executive_summary(json_data)
+            )
+            deficiency_analysis = loop.run_until_complete(
+                analyzer.analyze_deficiencies(json_data)
+            )
+        finally:
+            loop.close()
+
+        # Combine results (synchronous function, no loop needed)
+        insights = analyzer.enhance_summary_insights_sync(
+            deficiency_analysis, executive_summary
+        )
+
+        return jsonify({"success": True, "analysis": insights})
+
+    except json.JSONDecodeError:
+        return jsonify({"error": "Invalid JSON format"}), 400
+    except Exception as e:
+        return jsonify({"error": f"Analysis failed: {str(e)}"}), 500
+
+
 @app.route("/health")
 def health():
     """Health check endpoint."""
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+    analyzer = get_gemini_analyzer()
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "ai_enabled": analyzer.is_enabled(),
+    }
 
 
 if __name__ == "__main__":

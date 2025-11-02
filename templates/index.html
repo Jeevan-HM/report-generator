@@ -57,6 +57,25 @@
             <h2>Upload Inspection Data</h2>
             <p class="upload-description">Select your inspection JSON file to generate a comprehensive PDF report</p>
 
+            <!-- AI Analysis Toggle -->
+            <div class="ai-toggle-section">
+                <div class="ai-badge">
+                    <svg class="ai-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                        <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                    </svg>
+                    AI-Powered Analysis
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="aiAnalysisToggle">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+
             <form action="/upload" method="post" enctype="multipart/form-data" id="uploadForm">
                 <div class="file-input-wrapper">
                     <input type="file" name="file" id="fileInput" accept=".json" required>
@@ -75,15 +94,37 @@
                     </label>
                 </div>
 
-                <button type="submit" class="submit-btn" id="submitBtn">
-                    <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path
-                            d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                    Generate Report
-                </button>
+                <div class="button-group">
+                    <button type="button" class="submit-btn ai-btn" id="analyzeBtn" style="display: none;">
+                        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" />
+                            <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" />
+                        </svg>
+                        Get AI Analysis
+                    </button>
+
+                    <button type="submit" class="submit-btn" id="submitBtn">
+                        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path
+                                d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        Generate Report
+                    </button>
+                </div>
             </form>
+        </div>
+
+        <!-- AI Analysis Results -->
+        <div class="ai-results-card" id="aiResults" style="display: none;">
+            <div class="ai-results-header">
+                <svg class="ai-results-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" />
+                    <path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                </svg>
+                <h3>AI Analysis Results</h3>
+            </div>
+            <div id="aiResultsContent"></div>
         </div>
 
         <div class="features">
@@ -139,13 +180,125 @@
         const uploadForm = document.getElementById('uploadForm');
         const loadingOverlay = document.getElementById('loadingOverlay');
         const fileLabel = document.querySelector('.file-label');
+        const aiToggle = document.getElementById('aiAnalysisToggle');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const aiResults = document.getElementById('aiResults');
+        const aiResultsContent = document.getElementById('aiResultsContent');
+
+        let currentFile = null;
+
+        // AI Toggle handler
+        aiToggle.addEventListener('change', function () {
+            if (this.checked) {
+                analyzeBtn.style.display = 'block';
+            } else {
+                analyzeBtn.style.display = 'none';
+                aiResults.style.display = 'none';
+            }
+        });
+
+        // AI Analysis button handler
+        analyzeBtn.addEventListener('click', async function () {
+            if (!currentFile) {
+                alert('Please select a file first');
+                return;
+            }
+
+            loadingOverlay.classList.add('active');
+            document.getElementById('loadingText').textContent = 'AI is analyzing your inspection...';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', currentFile);
+
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success && data.analysis) {
+                    displayAIResults(data.analysis);
+                } else {
+                    alert(data.error || 'AI analysis failed');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                loadingOverlay.classList.remove('active');
+                document.getElementById('loadingText').textContent = 'Generating your report...';
+            }
+        });
+
+        // Display AI results
+        function displayAIResults(analysis) {
+            let html = '';
+
+            if (analysis.executive_summary) {
+                html += `
+                    <div class="ai-section">
+                        <h4>📊 Executive Summary</h4>
+                        <p class="ai-summary">${analysis.executive_summary}</p>
+                    </div>
+                `;
+            }
+
+            if (analysis.priority_summary) {
+                html += `
+                    <div class="ai-section">
+                        <h4>🎯 Priority Breakdown</h4>
+                        <pre class="ai-priorities">${analysis.priority_summary}</pre>
+                    </div>
+                `;
+            }
+
+            if (analysis.deficiency_categories) {
+                const cats = analysis.deficiency_categories;
+
+                if (cats.safety && cats.safety.length > 0) {
+                    html += `
+                        <div class="ai-section safety">
+                            <h4>⚠️ Safety Concerns (Immediate Attention)</h4>
+                            <ul>${cats.safety.map(item => `<li>${item}</li>`).join('')}</ul>
+                        </div>
+                    `;
+                }
+
+                if (cats.urgent && cats.urgent.length > 0) {
+                    html += `
+                        <div class="ai-section urgent">
+                            <h4>🔧 Urgent Issues (Within 30 Days)</h4>
+                            <ul>${cats.urgent.map(item => `<li>${item}</li>`).join('')}</ul>
+                        </div>
+                    `;
+                }
+
+                if (cats.routine && cats.routine.length > 0) {
+                    html += `
+                        <div class="ai-section routine">
+                            <h4>📝 Routine Maintenance (30+ Days)</h4>
+                            <ul>${cats.routine.map(item => `<li>${item}</li>`).join('')}</ul>
+                        </div>
+                    `;
+                }
+            }
+
+            aiResultsContent.innerHTML = html;
+            aiResults.style.display = 'block';
+            aiResults.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
 
         // File input change handler with animation
         fileInput.addEventListener('change', function (e) {
             if (e.target.files.length > 0) {
                 const file = e.target.files[0];
+                currentFile = file;
                 fileName.textContent = file.name;
                 fileName.classList.add('has-file');
+
+                // Hide AI results when new file is selected
+                aiResults.style.display = 'none';
 
                 // Add success animation
                 fileLabel.style.borderColor = '#10b981';
@@ -159,6 +312,7 @@
                     fileLabel.style.background = '';
                 }, 1500);
             } else {
+                currentFile = null;
                 fileName.textContent = 'No file chosen';
                 fileName.classList.remove('has-file');
             }
