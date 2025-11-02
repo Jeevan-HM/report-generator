@@ -3,8 +3,7 @@ venv
 __pycache__
 .DS_Store
 
-# LaTeX output files
-*.pdf
+# LaTeX auxiliary files (but not PDFs - those are tracked with LFS)
 *.aux
 *.log
 *.out

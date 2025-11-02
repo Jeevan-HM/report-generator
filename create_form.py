@@ -210,7 +210,29 @@ def generate_latex_body(data):
             checkbox_str = get_checkboxes(status, is_deficient)
 
             comments = item.get("comments", [])
-            if comments:
+
+            # Scenario 1: No comment AND inspection status is not null → Table with "No comment"
+            if not comments and status is not None:
+                body.append(r"\begin{longtable}{c c c c p{0.7\textwidth}}")
+                body.append(
+                    r"\textbf{I} & \textbf{NI} & \textbf{NP} & \textbf{D} & \textbf{Comments} \\ \hline \endhead"
+                )
+                body.append(f"{checkbox_str} & No comment \\\\")
+                body.append(r"\end{longtable}" + "\n")
+            # Scenario 2: There is comment BUT inspection status is null → Just the value, no table
+            elif comments and status is None:
+                for comment in comments:
+                    comment_value = comment.get("value")
+                    if comment_value:
+                        value_latex = escape_latex(str(comment_value))
+                        body.append(value_latex + r"\\" + "\n")
+                body.append(r"\vspace{1em}" + "\n")
+            # Scenario 3: No comment AND no inspection status → Just mention "No comment"
+            elif not comments and status is None:
+                body.append("No comment" + r"\\" + "\n")
+                body.append(r"\vspace{1em}" + "\n")
+            # Scenario 4: Has comments AND has inspection status → Full table
+            elif comments:
                 body.append(r"\begin{longtable}{c c c c " + comment_col + "}")
                 # Add a header that will repeat if the table spans pages
                 body.append(
@@ -222,8 +244,6 @@ def generate_latex_body(data):
                     label = r"\textbf{" + escape_latex(label_text) + "}"
                     body.append(f"{checkbox_str} & {label} \\\\")
 
-                    # --- UPDATED LOGIC FOR SAFER IMAGE SIZING ---
-                    # START
                     photos = comment.get("photos", [])
                     if photos:
                         valid_image_paths = []
@@ -233,6 +253,8 @@ def generate_latex_body(data):
                                 img_path = get_cached_image(url)
                                 if img_path:
                                     img_filename = os.path.basename(img_path)
+                                    # FIX: Since pdflatex runs from latex/ directory,
+                                    # and images are in latex/images/, we just need "images/filename"
                                     relative_img_path = os.path.join(
                                         "images", img_filename
                                     ).replace("\\", "/")
@@ -246,26 +268,18 @@ def generate_latex_body(data):
                             image_latex_parts = []
                             num_photos = len(valid_image_paths)
 
-                            # --- NEW, SAFER SIZES ---
-                            # These widths are smaller and should fit side-by-side
-                            # within the 0.7\textwidth column.
                             if num_photos == 1:
                                 img_width = "2.5in"
                             elif num_photos == 2:
-                                img_width = "2.0in"  # Total 4.0in
+                                img_width = "2.0in"
                             elif num_photos == 3:
-                                img_width = "1.5in"  # Total 4.5in
+                                img_width = "1.5in"
                             else:  # 4 or more
-                                img_width = "1.1in"  # Total 4.4in for 4
+                                img_width = "1.1in"
 
-                            # --- CRITICAL FIX ---
-                            # Set a maximum height for all images to prevent
-                            # tall/portrait images from running into the footer.
                             max_img_height = "2.5in"
 
                             for path in valid_image_paths:
-                                # Use width, max height, and keepaspectratio
-                                # This scales the image to fit BOTH constraints.
                                 image_latex_parts.append(
                                     r"\includegraphics[width="
                                     + img_width
@@ -276,35 +290,25 @@ def generate_latex_body(data):
                                     + "}"
                                 )
 
-                            # Join them with a small horizontal space
                             all_images_latex = r" \hspace{0.5em} ".join(
                                 image_latex_parts
                             )
 
-                            # --- CRITICAL FIX ---
-                            # 1. Use {\centering ... \par} to center the images
-                            #    in the table cell.
-                            # 2. Removed the \hspace{1cm} which was pushing
-                            #    images out of the column.
                             body.append(
                                 r"& & & & "
                                 + r"{\centering "
                                 + all_images_latex
-                                + r" \par} \\[0.5em]"  # Add vertical space after images
+                                + r" \par} \\[0.5em]"
                             )
 
-                    # If the comment has a 'value', display it in a new row
                     comment_value = comment.get("value")
                     if comment_value:
                         value_latex = escape_latex(str(comment_value))
-                        # Span all columns except the first four (checkboxes)
                         body.append(r"& & & & " + value_latex + r" \\")
-                    # --- UPDATED LOGIC FOR SAFER IMAGE SIZING ---
-                    # END
 
                 body.append(r"\end{longtable}" + "\n")
 
-            body.append(r"\vspace{1.5em}")  # Increased space between items
+            body.append(r"\vspace{1.5em}")
 
         body.append(r"\clearpage")
 
@@ -341,7 +345,7 @@ async def download_images_background(urls: list[str]):
     print(f"\n🚀 Starting background download of {len(urls)} images...")
 
     timeout = aiohttp.ClientTimeout(total=60, connect=10)
-    connector = aiohttp.TCPConnector(limit=10)  # Max 10 concurrent connections
+    connector = aiohttp.TCPConnector(limit=10)
 
     async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
         tasks = [download_and_cache_image(session, url) for url in urls]
@@ -369,16 +373,13 @@ async def main_async():
         print(f"Error loading {TEMPLATE_FILE}: {e}")
         return
 
-    # Collect all image URLs
     print("📥 Collecting image URLs...")
     image_urls = await collect_all_image_urls(data)
     print(f"Found {len(image_urls)} unique images")
 
-    # Download all images first before generating the report
     print("⏳ Downloading all images...")
     await download_images_background(image_urls)
 
-    # Generate report body with all cached images
     print("📝 Generating report body with all images...")
     report_body = generate_latex_body(data)
 
@@ -398,23 +399,27 @@ async def main_async():
         tex_filename_only = os.path.basename(FINAL_TEX_FILE)
 
         # Run from within the 'latex/' directory
-        subprocess.run(
+        result = subprocess.run(
             ["pdflatex", "-interaction=nonstopmode", tex_filename_only],
             check=True,
             cwd=run_directory,
+            capture_output=True,
+            text=True,
         )
 
         print("📄 Running pdflatex (Pass 2)...")
-        subprocess.run(
+        result = subprocess.run(
             ["pdflatex", "-interaction=nonstopmode", tex_filename_only],
             check=True,
             cwd=run_directory,
+            capture_output=True,
+            text=True,
         )
 
         print("\n✅ Done! ✅")
         print(f"Successfully generated {FINAL_PDF_FILE}")
 
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as e:
         print(f"\n❌ PDFLATEX FAILED ❌")
         print(
             f"A LaTeX error occurred. Python script is OK, but the .tex file is invalid."
@@ -423,6 +428,11 @@ async def main_async():
             f"To find the error, open the file 'latex/final_report.log' and scroll to the bottom."
         )
         print(f"Look for a line starting with '!'")
+        print(f"\nLast output from pdflatex:")
+        if e.stderr:
+            print(e.stderr[-500:])  # Last 500 chars
+        if e.stdout:
+            print(e.stdout[-500:])
 
     except FileNotFoundError:
         print("\n❌ PDFLATEX NOT FOUND ❌")
