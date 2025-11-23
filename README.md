@@ -423,7 +423,7 @@ For production, set these environment variables:
 ```bash
 export FLASK_ENV=production
 export FLASK_DEBUG=False
-export SECRET_KEY="generate-a-secure-random-key"
+export GEMINI_API_KEY="generate-a-secure-random-key"
 ```
 
 ## 📊 Performance
@@ -440,12 +440,6 @@ export SECRET_KEY="generate-a-secure-random-key"
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
 ## 📝 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
@@ -454,20 +448,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 **Jeevan-HM**
 - GitHub: [@Jeevan-HM](https://github.com/Jeevan-HM)
-
-## 🙏 Acknowledgments
-
-- Texas Real Estate Commission (TREC) for inspection standards
-- Flask community for excellent documentation
-- LaTeX community for powerful typesetting tools
-
-## 📧 Support
-
-For issues, questions, or suggestions:
-- Open an issue on GitHub
-- Contact: [Your email or contact method]
-
----
 
 <div align="center">
 Made with ❤️ for property inspectors
